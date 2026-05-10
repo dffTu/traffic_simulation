@@ -15,14 +15,11 @@ public class Benchmark {
     private static final int WS      = 11;
     private static final long SEED   = 42L;
 
-    static final int N_CPU = Runtime.getRuntime().availableProcessors();
-
     enum Strategy {
-        BASELINE,   // TCA  + Array2D    (4 phases, 1 thread)
-        INT,        // TCA  + Array2DInt  (4 phases, 1 thread)
-        V2,         // TCAv2+ Array2DInt  (5 phases, 1 thread)
-        V3,         // TCAv3+ Array2DInt  (3 phases, 1 thread)
-        V3_P        // TCAv3+ Array2DInt  (3 phases, N_CPU threads)
+        BASELINE,   // TCA  + Array2D   (4 фазы)
+        INT,        // TCA  + Array2DInt (4 фазы)
+        V2,         // TCAv2+ Array2DInt (5 фаз: computeGap + move + turns + lights)
+        V3          // TCAv3+ Array2DInt (3 фазы: moveAndLights + turns)
     }
 
     public static void main(String[] args) throws Exception {
@@ -31,23 +28,21 @@ public class Benchmark {
             {256, 1024}, {256, 2048}, {256, 4096}, {1000, 1000}
         };
 
-        System.out.printf("CPUs detected: %d%n%n", N_CPU);
+        System.out.printf("Parallel Calc: %d threads%n%n", Calc.N_CPU);
 
         System.out.println("JVM warmup ...");
         measureMs(72, 144, WARMUP, MEASURE, Strategy.BASELINE);
-        measureMs(72, 144, WARMUP, MEASURE, Strategy.V3_P);
+        measureMs(72, 144, WARMUP, MEASURE, Strategy.V3);
         System.out.println("done\n");
 
-        String header = String.format(
-                "%-14s  %-22s  %-22s  %-22s  %-22s  %-22s  %s  %s  %s  %s",
+        String header = String.format("%-14s  %-20s  %-20s  %-20s  %-20s  %s  %s  %s",
                 "Grid",
-                "BASE(Array2D)",
-                "INT",
-                "V2",
-                "V3(1t)",
-                "V3_P(" + N_CPU + "t)",
-                "Int×", "V2×", "V3×", "V3_P×");
-        String sep = "-".repeat(160);
+                "TCA+Array2D (base)",
+                "TCA+Array2DInt",
+                "TCAv2+Array2DInt",
+                "TCAv3+Array2DInt",
+                "SpeedupInt", "SpeedupV2", "SpeedupV3");
+        String sep = "-".repeat(130);
         System.out.println(header);
         System.out.println(sep);
 
@@ -59,9 +54,10 @@ public class Benchmark {
         try (PrintWriter txt = new PrintWriter(basePath + ".txt");
              PrintWriter csv = new PrintWriter(basePath + ".csv")) {
 
-            txt.println("Benchmark: BASE vs INT vs V2 vs V3 vs V3_P");
+            txt.println("Benchmark: TCA vs Array2DInt vs TCAv2 vs TCAv3");
             txt.println("warmup=" + WARMUP + "  measure=" + MEASURE
-                    + "  runs=" + RUNS + "  seed=" + SEED + "  cpus=" + N_CPU);
+                    + "  runs=" + RUNS + "  seed=" + SEED
+                    + "  threads=" + Calc.N_CPU);
             txt.println("date: " + timestamp);
             txt.println();
             txt.println(header);
@@ -72,8 +68,7 @@ public class Benchmark {
                     + "int_ms,int_sps,"
                     + "v2_ms,v2_sps,"
                     + "v3_ms,v3_sps,"
-                    + "v3p_ms,v3p_sps,"
-                    + "speedup_int,speedup_v2,speedup_v3,speedup_v3p");
+                    + "speedup_int,speedup_v2,speedup_v3");
 
             for (int[] sz : sizes) {
                 int w = sz[0], h = sz[1];
@@ -81,36 +76,31 @@ public class Benchmark {
                 long[] msInt  = new long[RUNS];
                 long[] msV2   = new long[RUNS];
                 long[] msV3   = new long[RUNS];
-                long[] msV3P  = new long[RUNS];
                 for (int r = 0; r < RUNS; r++) {
                     msBase[r] = measureMs(w, h, 0, MEASURE, Strategy.BASELINE);
                     msInt[r]  = measureMs(w, h, 0, MEASURE, Strategy.INT);
                     msV2[r]   = measureMs(w, h, 0, MEASURE, Strategy.V2);
                     msV3[r]   = measureMs(w, h, 0, MEASURE, Strategy.V3);
-                    msV3P[r]  = measureMs(w, h, 0, MEASURE, Strategy.V3_P);
                 }
                 long mBase = median(msBase), mInt = median(msInt),
-                     mV2   = median(msV2),   mV3  = median(msV3),
-                     mV3P  = median(msV3P);
+                     mV2   = median(msV2),   mV3  = median(msV3);
                 double sBase = sps(mBase), sInt = sps(mInt),
-                       sV2   = sps(mV2),   sV3  = sps(mV3),
-                       sV3P  = sps(mV3P);
-                double supInt = sInt/sBase, supV2 = sV2/sBase,
-                       supV3  = sV3/sBase,  supV3P = sV3P/sBase;
+                       sV2   = sps(mV2),   sV3  = sps(mV3);
+                double supInt = sInt / sBase, supV2 = sV2 / sBase, supV3 = sV3 / sBase;
 
                 String line = String.format(
-                        "%-14s  %5d ms (%6.0f/s)   %5d ms (%6.0f/s)   %5d ms (%6.0f/s)   %5d ms (%6.0f/s)   %5d ms (%6.0f/s)   %.2fx  %.2fx  %.2fx  %.2fx",
+                        "%-14s  %5d ms (%6.0f s/s)   %5d ms (%6.0f s/s)   %5d ms (%6.0f s/s)   %5d ms (%6.0f s/s)   %.2fx       %.2fx       %.2fx",
                         w + "x" + h,
-                        mBase, sBase, mInt, sInt, mV2, sV2, mV3, sV3, mV3P, sV3P,
-                        supInt, supV2, supV3, supV3P);
+                        mBase, sBase, mInt, sInt, mV2, sV2, mV3, sV3,
+                        supInt, supV2, supV3);
                 System.out.println(line);
                 txt.println(line);
 
                 csv.printf(Locale.US,
-                        "%dx%d,%d,%d,%d,%.0f,%d,%.0f,%d,%.0f,%d,%.0f,%d,%.0f,%.4f,%.4f,%.4f,%.4f%n",
+                        "%dx%d,%d,%d,%d,%.0f,%d,%.0f,%d,%.0f,%d,%.0f,%.4f,%.4f,%.4f%n",
                         w, h, w, h,
-                        mBase, sBase, mInt, sInt, mV2, sV2, mV3, sV3, mV3P, sV3P,
-                        supInt, supV2, supV3, supV3P);
+                        mBase, sBase, mInt, sInt, mV2, sV2, mV3, sV3,
+                        supInt, supV2, supV3);
             }
 
             System.out.printf("%nSaved: %s.txt  %s.csv%n", basePath, basePath);
@@ -122,26 +112,23 @@ public class Benchmark {
     static long measureMs(int w, int h, int warmup, int measure, Strategy s) throws Exception {
         GridFactory factory = (s == Strategy.BASELINE) ? Array2D::new : Array2DInt::new;
         TCA tca = switch (s) {
-            case V2   -> new TCAv2();
-            case V3   -> new TCAv3();
-            case V3_P -> new TCAv3();
-            default   -> new TCA();
+            case V2 -> new TCAv2();
+            case V3 -> new TCAv3();
+            default -> new TCA();
         };
-
-        CalcParallel cp = (s == Strategy.V3_P) ? new CalcParallel(N_CPU) : null;
 
         Random rng = new Random(SEED);
         Grid driver = filled(factory, w, h, 0.0);
         Grid lane   = factory.create(w, h);
-        run(new MapGen(), "generate", list(driver), list(lane), 0, rng, null);
+        run(new MapGen(), "generate", list(driver), list(lane), 0, rng);
 
         Grid pos    = factory.create(w, h);
-        run(tca, "putVehicle", list(lane), list(pos), 0, rng, null);
+        run(tca, "putVehicle", list(lane), list(pos), 0, rng);
 
         Grid length = factory.create(w, h);
         Grid speed  = factory.create(w, h);
-        run(tca, "setLength", list(pos), list(length), 3, rng, null);
-        run(tca, "setSpeed",  list(pos), list(speed),  0, rng, null);
+        run(tca, "setLength", list(pos), list(length), 3, rng);
+        run(tca, "setSpeed",  list(pos), list(speed),  0, rng);
 
         Grid temperature = filled(factory, w, h, 20.0);
         Grid gap = (s == Strategy.V2) ? factory.create(w, h) : null;
@@ -149,49 +136,43 @@ public class Benchmark {
         Grid[] spd = {speed,  factory.create(w, h)};
         Grid[] len = {length, factory.create(w, h)};
 
-        for (int i = 0; i < warmup; i++) step(tca, lane, spd, len, temperature, gap, cp, s, rng);
+        for (int i = 0; i < warmup; i++) step(tca, lane, spd, len, temperature, gap, s, rng);
 
         long t0 = System.nanoTime();
-        for (int i = 0; i < measure; i++) step(tca, lane, spd, len, temperature, gap, cp, s, rng);
-        long result = (System.nanoTime() - t0) / 1_000_000;
-        if (cp != null) cp.shutdown();
-        return result;
+        for (int i = 0; i < measure; i++) step(tca, lane, spd, len, temperature, gap, s, rng);
+        return (System.nanoTime() - t0) / 1_000_000;
     }
 
     private static void step(TCA tca, Grid lane, Grid[] spd, Grid[] len,
-                              Grid temp, Grid gap, CalcParallel cp,
-                              Strategy s, Random rng) throws Exception {
-        if (s == Strategy.V3 || s == Strategy.V3_P) {
-            // 3 phases: moveAndLights → turnLeft → turnRight
-            run(tca, "moveAndLightsPhase", list(lane, spd[0], len[0], temp), list(spd[1], len[1]), WS, rng, cp);
+                              Grid temp, Grid gap, Strategy s, Random rng) throws Exception {
+        if (s == Strategy.V3) {
+            run(tca, "moveAndLightsPhase", list(lane, spd[0], len[0], temp), list(spd[1], len[1]), WS, rng);
             swap(spd); swap(len);
-            run(tca, "turnLeftPhase",  list(lane, spd[0], len[0]), list(spd[1], len[1]), WS, rng, cp);
+            run(tca, "turnLeftPhase",  list(lane, spd[0], len[0]), list(spd[1], len[1]), WS, rng);
             swap(spd); swap(len);
-            run(tca, "turnRightPhase", list(lane, spd[0], len[0]), list(spd[1], len[1]), WS, rng, cp);
+            run(tca, "turnRightPhase", list(lane, spd[0], len[0]), list(spd[1], len[1]), WS, rng);
             swap(spd); swap(len);
         } else {
-            // 4 phases (baseline/INT); 5 phases for V2 (extra computeGap)
             if (gap != null) {
-                run(tca, "computeGap", list(spd[0], lane, len[0]), list(gap), WS, rng, null);
-                run(tca, "moveForwardPhase", list(lane, spd[0], len[0], temp, gap), list(spd[1], len[1]), WS, rng, null);
+                run(tca, "computeGap", list(spd[0], lane, len[0]), list(gap), WS, rng);
+                run(tca, "moveForwardPhase", list(lane, spd[0], len[0], temp, gap), list(spd[1], len[1]), WS, rng);
             } else {
-                run(tca, "moveForwardPhase", list(lane, spd[0], len[0], temp), list(spd[1], len[1]), WS, rng, null);
+                run(tca, "moveForwardPhase", list(lane, spd[0], len[0], temp), list(spd[1], len[1]), WS, rng);
             }
             swap(spd); swap(len);
-            run(tca, "turnLeftPhase",  list(lane, spd[0], len[0]), list(spd[1], len[1]), WS, rng, null);
+            run(tca, "turnLeftPhase",  list(lane, spd[0], len[0]), list(spd[1], len[1]), WS, rng);
             swap(spd); swap(len);
-            run(tca, "turnRightPhase", list(lane, spd[0], len[0]), list(spd[1], len[1]), WS, rng, null);
+            run(tca, "turnRightPhase", list(lane, spd[0], len[0]), list(spd[1], len[1]), WS, rng);
             swap(spd); swap(len);
-            run(tca, "lightsPhase",    list(lane, spd[0], len[0]), list(spd[1], len[1]), WS, rng, null);
+            run(tca, "lightsPhase",    list(lane, spd[0], len[0]), list(spd[1], len[1]), WS, rng);
             swap(spd); swap(len);
         }
     }
 
     private static void run(Object host, String method,
                              List<? extends Grid> in, List<? extends Grid> out,
-                             int ws, Random rng, CalcParallel cp) throws Exception {
-        if (cp != null) cp.run(host, method, in, out, ws, ws, rng);
-        else            Calc.run(host, method, in, out, ws, ws, rng);
+                             int ws, Random rng) throws Exception {
+        Calc.run(host, method, in, out, ws, ws, rng);
     }
 
     private static Grid filled(GridFactory f, int w, int h, double v) {

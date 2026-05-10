@@ -12,7 +12,6 @@ public class Main {
         int scale   = args.length >= 5 ? Integer.parseInt(args[4]) : 4;
         String grid = args.length >= 6 ? args[5].toLowerCase()     : "int";
         String ver  = args.length >= 7 ? args[6].toLowerCase()     : "v3";
-        int threads = args.length >= 8 ? Integer.parseInt(args[7]) : 1;
 
         GridFactory factory;
         switch (grid) {
@@ -33,16 +32,13 @@ public class Main {
                 System.exit(1); return;
         }
 
-        System.out.printf("grid %dx%d  steps=%d  seed=%d  scale=%d  grid=%s  tca=%s  threads=%d%n%n",
-                width, height, steps, seed, scale, grid, ver, threads);
-
-        parallel = threads > 1 ? new CalcParallel(threads) : null;
+        System.out.printf("grid %dx%d  steps=%d  seed=%d  scale=%d  grid=%s  tca=%s%n%n",
+                width, height, steps, seed, scale, grid, ver);
 
         Random rng = new Random(seed);
         final int WS = 11;
         long t0 = System.nanoTime();
 
-        // ── Init ─────────────────────────────────────────────────────────
         Grid driver = fill(factory, width, height, 0.0);
         Grid lane   = factory.create(width, height);
         calc(new MapGen(), "generate", rng, 0, in(driver), out(lane));
@@ -63,14 +59,13 @@ public class Main {
         printStats("step 0", speed, length, lane);
         if (scale > 0) saveFrame(lane, speed, length, scale, 0);
 
-        // ── Simulation loop ───────────────────────────────────────────────
         Grid[] spd = {speed,  factory.create(width, height)};
         Grid[] len = {length, factory.create(width, height)};
 
         for (int step = 1; step <= steps; step++) {
 
             if (tca instanceof TCAv3) {
-                // 3 фазы: moveAndLights → turnLeft → turnRight
+                // TCAv3, 3 фазы: moveAndLights → turnLeft → turnRight
                 calc(tca, "moveAndLightsPhase", rng, WS,
                         in(lane, spd[0], len[0], temperature), out(spd[1], len[1]));
                 swap(spd); swap(len);
@@ -82,7 +77,7 @@ public class Main {
                 swap(spd); swap(len);
 
             } else if (tca instanceof TCAv2) {
-                // 5 фаз: computeGap → moveForward → turnLeft → turnRight → lights
+                // TCAv2, 5 фаз: computeGap → moveForward → turnLeft → turnRight → lights
                 calc(tca, "computeGap", rng, WS, in(spd[0], lane, len[0]), out(gap));
 
                 calc(tca, "moveForwardPhase", rng, WS,
@@ -124,20 +119,11 @@ public class Main {
         System.out.printf("%nsimulation done in %d ms (%.1f steps/sec)%n",
                 (tEnd - tInit) / 1_000_000,
                 steps * 1000.0 / ((tEnd - tInit) / 1_000_000.0));
-
-        if (parallel != null) parallel.shutdown();
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────
-
-    private static CalcParallel parallel;
 
     private static void calc(Object host, String method, Random rng, int ws,
                               List<Grid> inputs, List<Grid> outputs) throws Exception {
-        if (parallel != null)
-            parallel.run(host, method, inputs, outputs, ws, ws, rng);
-        else
-            Calc.run(host, method, inputs, outputs, ws, ws, rng);
+        Calc.run(host, method, inputs, outputs, ws, ws, rng);
     }
 
     @SafeVarargs

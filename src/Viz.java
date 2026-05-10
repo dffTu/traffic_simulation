@@ -17,10 +17,10 @@ public class Viz {
     private static final Color LIGHT_YELLOW = new Color(245, 200, 60);
     private static final Color LIGHT_SN = new Color(120, 80, 190);
 
-    private static final Color SPEED_0    = new Color( 40,  40,  40);   // stopped: dark gray
-    private static final Color SPEED_1    = new Color(  0,  90, 230);   // slow:    saturated blue
-    private static final Color SPEED_2    = new Color(200,   0, 220);   // medium:  magenta
-    private static final Color SPEED_3    = new Color(255, 120,   0);   // fast:    orange
+    private static final Color SPEED_0    = new Color( 40,  40,  40);   // темно-серый
+    private static final Color SPEED_1    = new Color(  0,  90, 230);   // светло-голубой
+    private static final Color SPEED_2    = new Color(200,   0, 220);   // пурпурный
+    private static final Color SPEED_3    = new Color(255, 120,   0);   // оранжевый
 
     public static BufferedImage render(Grid lane, Grid speed, Grid length, int scale) {
         int w = lane.width();
