@@ -19,7 +19,8 @@ public class Benchmark {
         BASELINE,   // TCA  + Array2D   (4 фазы)
         INT,        // TCA  + Array2DInt (4 фазы)
         V2,         // TCAv2+ Array2DInt (5 фаз: computeGap + move + turns + lights)
-        V3          // TCAv3+ Array2DInt (3 фазы: moveAndLights + turns)
+        V3,         // TCAv3+ Array2DInt (3 фазы: moveAndLights + turns)
+        V4          // TCAv4+ Array2DInt (3 фазы + precomputed TL lookup)
     }
 
     public static void main(String[] args) throws Exception {
@@ -35,14 +36,15 @@ public class Benchmark {
         measureMs(72, 144, WARMUP, MEASURE, Strategy.V3);
         System.out.println("done\n");
 
-        String header = String.format("%-14s  %-20s  %-20s  %-20s  %-20s  %s  %s  %s",
+        String header = String.format("%-14s  %-20s  %-20s  %-20s  %-20s  %-20s  %s  %s  %s  %s",
                 "Grid",
                 "TCA+Array2D (base)",
                 "TCA+Array2DInt",
                 "TCAv2+Array2DInt",
                 "TCAv3+Array2DInt",
-                "SpeedupInt", "SpeedupV2", "SpeedupV3");
-        String sep = "-".repeat(130);
+                "TCAv4+Array2DInt",
+                "Int×", "V2×", "V3×", "V4×");
+        String sep = "-".repeat(148);
         System.out.println(header);
         System.out.println(sep);
 
@@ -54,7 +56,7 @@ public class Benchmark {
         try (PrintWriter txt = new PrintWriter(basePath + ".txt");
              PrintWriter csv = new PrintWriter(basePath + ".csv")) {
 
-            txt.println("Benchmark: TCA vs Array2DInt vs TCAv2 vs TCAv3");
+            txt.println("Benchmark: TCA vs Array2DInt vs TCAv2 vs TCAv3 vs TCAv4");
             txt.println("warmup=" + WARMUP + "  measure=" + MEASURE
                     + "  runs=" + RUNS + "  seed=" + SEED
                     + "  threads=" + Calc.N_CPU);
@@ -76,31 +78,36 @@ public class Benchmark {
                 long[] msInt  = new long[RUNS];
                 long[] msV2   = new long[RUNS];
                 long[] msV3   = new long[RUNS];
+                long[] msV4   = new long[RUNS];
                 for (int r = 0; r < RUNS; r++) {
                     msBase[r] = measureMs(w, h, 0, MEASURE, Strategy.BASELINE);
                     msInt[r]  = measureMs(w, h, 0, MEASURE, Strategy.INT);
                     msV2[r]   = measureMs(w, h, 0, MEASURE, Strategy.V2);
                     msV3[r]   = measureMs(w, h, 0, MEASURE, Strategy.V3);
+                    msV4[r]   = measureMs(w, h, 0, MEASURE, Strategy.V4);
                 }
                 long mBase = median(msBase), mInt = median(msInt),
-                     mV2   = median(msV2),   mV3  = median(msV3);
+                     mV2   = median(msV2),   mV3  = median(msV3),
+                     mV4   = median(msV4);
                 double sBase = sps(mBase), sInt = sps(mInt),
-                       sV2   = sps(mV2),   sV3  = sps(mV3);
-                double supInt = sInt / sBase, supV2 = sV2 / sBase, supV3 = sV3 / sBase;
+                       sV2   = sps(mV2),   sV3  = sps(mV3),
+                       sV4   = sps(mV4);
+                double supInt = sInt/sBase, supV2 = sV2/sBase,
+                       supV3  = sV3/sBase,  supV4 = sV4/sBase;
 
                 String line = String.format(
-                        "%-14s  %5d ms (%6.0f s/s)   %5d ms (%6.0f s/s)   %5d ms (%6.0f s/s)   %5d ms (%6.0f s/s)   %.2fx       %.2fx       %.2fx",
+                        "%-14s  %5d ms (%5.0f/s)  %5d ms (%5.0f/s)  %5d ms (%5.0f/s)  %5d ms (%5.0f/s)  %5d ms (%5.0f/s)  %.2fx  %.2fx  %.2fx  %.2fx",
                         w + "x" + h,
-                        mBase, sBase, mInt, sInt, mV2, sV2, mV3, sV3,
-                        supInt, supV2, supV3);
+                        mBase, sBase, mInt, sInt, mV2, sV2, mV3, sV3, mV4, sV4,
+                        supInt, supV2, supV3, supV4);
                 System.out.println(line);
                 txt.println(line);
 
                 csv.printf(Locale.US,
-                        "%dx%d,%d,%d,%d,%.0f,%d,%.0f,%d,%.0f,%d,%.0f,%.4f,%.4f,%.4f%n",
+                        "%dx%d,%d,%d,%d,%.0f,%d,%.0f,%d,%.0f,%d,%.0f,%d,%.0f,%.4f,%.4f,%.4f,%.4f%n",
                         w, h, w, h,
-                        mBase, sBase, mInt, sInt, mV2, sV2, mV3, sV3,
-                        supInt, supV2, supV3);
+                        mBase, sBase, mInt, sInt, mV2, sV2, mV3, sV3, mV4, sV4,
+                        supInt, supV2, supV3, supV4);
             }
 
             System.out.printf("%nSaved: %s.txt  %s.csv%n", basePath, basePath);
@@ -114,6 +121,7 @@ public class Benchmark {
         TCA tca = switch (s) {
             case V2 -> new TCAv2();
             case V3 -> new TCAv3();
+            case V4 -> new TCAv4();
             default -> new TCA();
         };
 
@@ -121,6 +129,7 @@ public class Benchmark {
         Grid driver = filled(factory, w, h, 0.0);
         Grid lane   = factory.create(w, h);
         run(new MapGen(), "generate", list(driver), list(lane), 0, rng);
+        if (s == Strategy.V4) ((TCAv4) tca).init(lane);
 
         Grid pos    = factory.create(w, h);
         run(tca, "putVehicle", list(lane), list(pos), 0, rng);
@@ -145,7 +154,7 @@ public class Benchmark {
 
     private static void step(TCA tca, Grid lane, Grid[] spd, Grid[] len,
                               Grid temp, Grid gap, Strategy s, Random rng) throws Exception {
-        if (s == Strategy.V3) {
+        if (s == Strategy.V3 || s == Strategy.V4) {
             run(tca, "moveAndLightsPhase", list(lane, spd[0], len[0], temp), list(spd[1], len[1]), WS, rng);
             swap(spd); swap(len);
             run(tca, "turnLeftPhase",  list(lane, spd[0], len[0]), list(spd[1], len[1]), WS, rng);

@@ -24,11 +24,12 @@ public class Main {
 
         TCA tca;
         switch (ver) {
+            case "v4":  tca = new TCAv4(); break;
             case "v3":  tca = new TCAv3(); break;
             case "v2":  tca = new TCAv2(); break;
             case "tca": tca = new TCA();   break;
             default:
-                System.err.println("tca: tca | v2 | v3");
+                System.err.println("tca: tca | v2 | v3 | v4");
                 System.exit(1); return;
         }
 
@@ -53,6 +54,8 @@ public class Main {
 
         Grid temperature = fill(factory, width, height, 20.0);
         Grid gap = (tca instanceof TCAv2) ? factory.create(width, height) : null;
+
+        if (tca instanceof TCAv4) ((TCAv4) tca).init(lane);
 
         long tInit = System.nanoTime();
         System.out.printf("init done in %d ms%n", (tInit - t0) / 1_000_000);

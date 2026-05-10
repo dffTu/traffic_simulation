@@ -1,14 +1,14 @@
-Benchmark: TCA vs Array2DInt vs TCAv2 vs TCAv3
+Benchmark: TCA vs Array2DInt vs TCAv2 vs TCAv3 vs TCAv4
 warmup=20  measure=50  runs=5  seed=42  threads=8
 
-Grid            TCA+Array2D (base)    TCA+Array2DInt        TCAv2+Array2DInt      TCAv3+Array2DInt      SpeedupInt  SpeedupV2  SpeedupV3
-----------------------------------------------------------------------------------------------------------------------------------
-72x144             11 ms (  4545 s/s)      10 ms (  5000 s/s)      13 ms (  3846 s/s)       8 ms (  6250 s/s)   1,10x       0,85x       1,38x
-144x288            23 ms (  2174 s/s)      18 ms (  2778 s/s)      21 ms (  2381 s/s)      14 ms (  3571 s/s)   1,28x       1,10x       1,64x
-256x512            49 ms (  1020 s/s)      33 ms (  1515 s/s)      39 ms (  1282 s/s)      26 ms (  1923 s/s)   1,48x       1,26x       1,88x
-256x1024           87 ms (   575 s/s)      54 ms (   926 s/s)      63 ms (   794 s/s)      43 ms (  1163 s/s)   1,61x       1,38x       2,02x
-256x2048          174 ms (   287 s/s)      94 ms (   532 s/s)     111 ms (   450 s/s)      77 ms (   649 s/s)   1,85x       1,57x       2,26x
-256x4096          347 ms (   144 s/s)     185 ms (   270 s/s)     214 ms (   234 s/s)     158 ms (   316 s/s)   1,88x       1,62x       2,20x
-1000x1000         347 ms (   144 s/s)     173 ms (   289 s/s)     190 ms (   263 s/s)     135 ms (   370 s/s)   2,01x       1,83x       2,57x
+Grid            TCA+Array2D (base)    TCA+Array2DInt        TCAv2+Array2DInt      TCAv3+Array2DInt      TCAv4+Array2DInt      Int×  V2×  V3×  V4×
+----------------------------------------------------------------------------------------------------------------------------------------------------
+72x144             11 ms ( 4545/s)     11 ms ( 4545/s)     12 ms ( 4167/s)     11 ms ( 4545/s)     10 ms ( 5000/s)  1,00x  0,92x  1,00x  1,10x
+144x288            24 ms ( 2083/s)     17 ms ( 2941/s)     21 ms ( 2381/s)     14 ms ( 3571/s)     13 ms ( 3846/s)  1,41x  1,14x  1,71x  1,85x
+256x512            54 ms (  926/s)     33 ms ( 1515/s)     39 ms ( 1282/s)     25 ms ( 2000/s)     23 ms ( 2174/s)  1,64x  1,38x  2,16x  2,35x
+256x1024           96 ms (  521/s)     53 ms (  943/s)     62 ms (  806/s)     42 ms ( 1190/s)     37 ms ( 1351/s)  1,81x  1,55x  2,29x  2,59x
+256x2048          197 ms (  254/s)     92 ms (  543/s)    107 ms (  467/s)     74 ms (  676/s)     64 ms (  781/s)  2,14x  1,84x  2,66x  3,08x
+256x4096          388 ms (  129/s)    181 ms (  276/s)    209 ms (  239/s)    148 ms (  338/s)    125 ms (  400/s)  2,14x  1,86x  2,62x  3,10x
+1000x1000         368 ms (  136/s)    166 ms (  301/s)    188 ms (  266/s)    133 ms (  376/s)    115 ms (  435/s)  2,22x  1,96x  2,77x  3,20x
 
 warmup=20  measure=50  runs=5  seed=42
